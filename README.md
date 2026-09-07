@@ -1,3 +1,7 @@
+TOOLBOX UNDER DEVELOPMENT. 
+
+The automated formulation of PEP problems is directly taken from [https://github.com/PerformanceEstimation/PEPit.jl]
+
 # PEPDesign
 
 Parametric Performance Estimation and step-size policy design — the toolbox
