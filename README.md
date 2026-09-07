@@ -1,12 +1,16 @@
-TOOLBOX UNDER DEVELOPMENT. 
+TOOLBOX UNDER DEVELOPMENT with a mix of AI and Human generated content. 
 
-The automated formulation of PEP problems is directly taken from [https://github.com/PerformanceEstimation/PEPit.jl]
+The automated formulation of PEP problems is directly taken from https://github.com/PerformanceEstimation/PEPit.jl 
+
+References: 
+https://arxiv.org/abs/2507.20773
+https://www.youtube.com/watch?v=2vp65pXp5Xk
 
 # PEPDesign
 
 Parametric Performance Estimation and step-size policy design — the toolbox
 accompanying *"Principled Robust Design of First-Order Methods via
-Parameterized Step-Size Policies"*.
+Parameterized Step-Size Policies"* which should be released in September 2026. 
 
 Successor of the legacy `src/` (FOM_SOM) library. Given a first-order method
 written as a short algebraic recurrence, PEPDesign **automatically derives**
