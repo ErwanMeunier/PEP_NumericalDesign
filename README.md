@@ -3,8 +3,8 @@ TOOLBOX UNDER DEVELOPMENT with a mix of AI and Human generated content.
 The automated formulation of PEP problems is directly taken from https://github.com/PerformanceEstimation/PEPit.jl 
 
 References: 
-https://arxiv.org/abs/2507.20773
-https://www.youtube.com/watch?v=2vp65pXp5Xk
+- https://arxiv.org/abs/2507.20773
+- https://www.youtube.com/watch?v=2vp65pXp5Xk
 
 # PEPDesign
 
