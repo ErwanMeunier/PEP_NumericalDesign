@@ -1,7 +1,7 @@
 # Experiments Guide
 
 How to reproduce every numerical artifact of the paper with
-`PEPDesign/experiments/`. See [manual.md](manual.md) for the API and
+`experiments/`. See [manual.md](manual.md) for the API and
 [cluster.md](cluster.md) for running the heavy grids on CECI.
 
 ---
@@ -11,10 +11,10 @@ How to reproduce every numerical artifact of the paper with
 All scripts run from the repository root under the root environment:
 
 ```powershell
-julia --project=. --threads=4 PEPDesign/experiments/exp1_policy_vs_free.jl [--smoke]
-julia --project=. --threads=4 PEPDesign/experiments/exp2_hrdp_anytime.jl  [--smoke]
-julia --project=. --threads=4 PEPDesign/experiments/exp3_ogd_sN.jl        [--smoke]
-julia --project=. --threads=4 PEPDesign/experiments/exp4_ssdp_diagnostics.jl [--smoke]
+julia --project=. --threads=4 experiments/exp1_policy_vs_free.jl [--smoke]
+julia --project=. --threads=4 experiments/exp2_hrdp_anytime.jl  [--smoke]
+julia --project=. --threads=4 experiments/exp3_ogd_sN.jl        [--smoke]
+julia --project=. --threads=4 experiments/exp4_ssdp_diagnostics.jl [--smoke]
 ```
 
 - `--smoke`: tiny configuration (minutes, laptop) to check the pipeline.
@@ -113,13 +113,13 @@ solver nondeterminism at the 1e-8 level).
 ## 5. Using cluster outputs
 
 The [cluster pipeline](cluster.md) writes per-task JLD2 files and
-`summary_<method>.jld2` aggregates under `PEPDesign/cluster/out/<tag>/`.
+`summary_<method>.jld2` aggregates under `cluster/out/<tag>/`.
 Their schemas match the local experiment outputs (`bests`/`solves` curves,
 `tailored`/`transfer`/`reuse` vectors, `Wstar` dicts), so the plotting and
 table code in the experiment scripts can be pointed at them — load with
 
 ```julia
 using JLD2
-s = load("PEPDesign/cluster/out/default/summary_OGD.jld2", "summary")
+s = load("cluster/out/default/summary_OGD.jld2", "summary")
 s["Wstar"], s["designs"], s["hrdp"]
 ```

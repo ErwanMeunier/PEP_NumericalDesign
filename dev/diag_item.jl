@@ -1,9 +1,9 @@
 # Diagnose ITEM discrepancies: coefficient indexing conventions, old-vs-new
 # value at identical θ, and gradient/FD consistency.
-# Run: julia --project=. PEPDesign/dev/diag_item.jl
+# Run: julia --project=. dev/diag_item.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 using JuMP, Mosek, MosekTools, LinearAlgebra, SparseArrays, Random, Printf
 

@@ -31,6 +31,10 @@ function design_som(dp::AbstractDesignObjective, ω0::AbstractVector{<:Real};
                     verbose::Bool = false,
                     sigma_met::Float64 = -1.0, theta_met::Float64 = 2.0,
                     M_met::Int = 10)
+    supports_hessian(dp) ||
+        error("design_som is unavailable with facial reduction because the " *
+              "reduced-basis curvature is not an original dual certificate; " *
+              "use design_fom instead")
     κ = length(ω0)
     ev = PEPEvaluator(dp, κ; hess = true)
     c1 = 1e-4

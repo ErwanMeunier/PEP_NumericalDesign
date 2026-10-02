@@ -1,8 +1,8 @@
 # IGDM parity and sensitivity checks: new PEPDesign vs legacy src/.
-# Run from repo root:  julia --project=. PEPDesign/dev/parity_igdm.jl
+# Run from repo root:  julia --project=. dev/parity_igdm.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 using JuMP, Mosek, MosekTools, LinearAlgebra, SparseArrays, Random, Test
 

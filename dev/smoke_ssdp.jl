@@ -1,8 +1,8 @@
 # SSDP smoke test on OGD with the constant policy.
-# Run: julia --project=. PEPDesign/dev/smoke_ssdp.jl
+# Run: julia --project=. dev/smoke_ssdp.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 include(joinpath(@__DIR__, "..", "src", "PEPDesign.jl"))
 using .PEPDesign

@@ -1,9 +1,9 @@
 # ITEM parity and sensitivity checks: new PEPDesign vs legacy src/ and the
 # analytic optimum. Run from repo root:
-#   julia --project=. PEPDesign/dev/parity_item.jl
+#   julia --project=. dev/parity_item.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 using JuMP, Mosek, MosekTools, LinearAlgebra, SparseArrays, Random, Test
 

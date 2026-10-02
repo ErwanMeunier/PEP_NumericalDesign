@@ -29,7 +29,7 @@ for what each experiment computes.
 | 3 | `cluster/phase3_aggregate.jl` | aggregation into `summary_<method>.jld2` | phases 1–2 |
 
 All tasks are **idempotent**: each writes exactly one JLD2 file under
-`PEPDesign/cluster/out/<tag>/` and skips itself if that file exists. Re-run a
+`cluster/out/<tag>/` and skips itself if that file exists. Re-run a
 failed array index at any time; delete an output file to force recomputation.
 
 ## 2. One-time setup on a CECI cluster
@@ -41,7 +41,7 @@ documentation for your cluster (Lemaitre4, NIC5, Hercules2, …).
 
 ```bash
 ssh <cluster>
-git clone <your-repo-url> ~/TANGO && cd ~/TANGO/WP1/Opt_Methods
+git clone <your-repo-url> ~/PEP_NumericalDesign && cd ~/PEP_NumericalDesign
 ```
 
 ### 2.2 Julia
@@ -129,7 +129,7 @@ append only, or start a fresh tag.
 Print the array sizes (used by the submit script):
 
 ```bash
-julia --project=. PEPDesign/cluster/registry.jl counts
+julia --project=. cluster/registry.jl counts
 # phase0=…  phase1=…  phase2=…
 ```
 
@@ -142,8 +142,8 @@ phase2 = 21 tasks.
 ### 4.1 Everything at once
 
 ```bash
-bash PEPDesign/cluster/slurm/submit_all.sh            # tag "default"
-bash PEPDesign/cluster/slurm/submit_all.sh mytag      # custom tag
+bash cluster/slurm/submit_all.sh            # tag "default"
+bash cluster/slurm/submit_all.sh mytag      # custom tag
 ```
 
 The script instantiates the environment, queries the registry for array
@@ -158,19 +158,19 @@ sizes, patches them into the templates, and chains the jobs:
 One tag per ε (results land in separate output directories):
 
 ```bash
-PEP_IGDM_EPS=0.1 bash PEPDesign/cluster/slurm/submit_all.sh eps01
-PEP_IGDM_EPS=0.3 bash PEPDesign/cluster/slurm/submit_all.sh eps03
-PEP_IGDM_EPS=0.5 bash PEPDesign/cluster/slurm/submit_all.sh eps05
+PEP_IGDM_EPS=0.1 bash cluster/slurm/submit_all.sh eps01
+PEP_IGDM_EPS=0.3 bash cluster/slurm/submit_all.sh eps03
+PEP_IGDM_EPS=0.5 bash cluster/slurm/submit_all.sh eps05
 ```
 
 ### 4.3 Manual submission / partial reruns
 
 ```bash
 # rerun only phase-1 task 17 of tag "default"
-PEP_TAG=default sbatch --array=17 <(sed 's/__NTASKS1__/84/' PEPDesign/cluster/slurm/phase1.slurm)
+PEP_TAG=default sbatch --array=17 <(sed 's/__NTASKS1__/84/' cluster/slurm/phase1.slurm)
 
 # or interactively on a compute node (srun) / the login node for tiny tasks:
-PEP_TAG=default julia --project=. --threads=4 PEPDesign/cluster/phase1_designs.jl 17
+PEP_TAG=default julia --project=. --threads=4 cluster/phase1_designs.jl 17
 ```
 
 Any phase script also accepts `--local-all` to loop over all its tasks
@@ -205,16 +205,16 @@ HRDP evaluations and across FD probes.
 ```bash
 squeue --me                               # queue state
 sacct -j <jobid> --format=JobID,State,Elapsed,MaxRSS,ExitCode
-ls PEPDesign/cluster/logs/                # pep_phase1_<taskid>.out
-grep -l "ERROR" PEPDesign/cluster/logs/*.out   # find failed tasks
-ls PEPDesign/cluster/out/<tag>/           # per-task JLD2 outputs
+ls cluster/logs/                # pep_phase1_<taskid>.out
+grep -l "ERROR" cluster/logs/*.out   # find failed tasks
+ls cluster/out/<tag>/           # per-task JLD2 outputs
 ```
 
 A finished tag contains `wstar_*.jld2`, `design_*.jld2`, `hrdp_*.jld2` and
 the aggregated `summary_{OGD,ITEM,IGDM}.jld2`. Fetch to your machine:
 
 ```bash
-rsync -av <cluster>:~/TANGO/WP1/Opt_Methods/PEPDesign/cluster/out/ PEPDesign/cluster/out/
+rsync -av <cluster>:~/PEP_NumericalDesign/cluster/out/ cluster/out/
 ```
 
 then plot/tabulate locally (schemas match the experiment scripts — see
@@ -226,7 +226,7 @@ Because tasks skip existing outputs, the cheapest resume is to resubmit the
 whole array — completed tasks exit in seconds:
 
 ```bash
-PEP_TAG=default sbatch <(sed 's/__NTASKS1__/84/' PEPDesign/cluster/slurm/phase1.slurm)
+PEP_TAG=default sbatch <(sed 's/__NTASKS1__/84/' cluster/slurm/phase1.slurm)
 ```
 
 then rerun phase 3.
@@ -238,11 +238,11 @@ Before burning cluster hours, validate the whole pipeline on your machine
 
 ```powershell
 $env:PEP_SMOKE = "1"
-julia --project=. PEPDesign/cluster/registry.jl counts
-julia --project=. --threads=4 PEPDesign/cluster/phase0_wstar.jl  --local-all
-julia --project=. --threads=4 PEPDesign/cluster/phase1_designs.jl --local-all
-julia --project=. --threads=4 PEPDesign/cluster/phase2_hrdp.jl    --local-all
-julia --project=.             PEPDesign/cluster/phase3_aggregate.jl
+julia --project=. cluster/registry.jl counts
+julia --project=. --threads=4 cluster/phase0_wstar.jl  --local-all
+julia --project=. --threads=4 cluster/phase1_designs.jl --local-all
+julia --project=. --threads=4 cluster/phase2_hrdp.jl    --local-all
+julia --project=.             cluster/phase3_aggregate.jl
 Remove-Item Env:PEP_SMOKE
 ```
 

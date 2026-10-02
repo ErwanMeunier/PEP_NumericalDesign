@@ -37,28 +37,20 @@ Companion guides: [experiments.md](experiments.md) (paper experiments),
 Requirements: Julia ≥ 1.10 and a Mosek license (free for academia; the
 open-source fallback is any JuMP SDP solver through `GenericBackend`).
 
-Two environments exist:
-
-| Environment | Path | Purpose |
-|---|---|---|
-| **Root** (recommended) | `Opt_Methods/Project.toml` | Package deps **plus** Plots/JLD2/LaTeXStrings for scripts. All dev/experiment/cluster scripts activate this one. |
-| Package | `PEPDesign/Project.toml` | Core deps only (JuMP, Mosek, MosekTools, ForwardDiff, SparseArrays…). Use if you embed PEPDesign elsewhere. |
+The repository root is the Julia project. Development, experiment, and
+cluster scripts activate this environment.
 
 ```powershell
-cd Opt_Methods
+cd PEP_NumericalDesign
 julia --project=. -e "import Pkg; Pkg.instantiate()"
-julia --project=. --threads=4 PEPDesign/dev/run_all_tests.jl   # ~2 min, needs Mosek
+julia --project=. --threads=4 dev/run_all_tests.jl   # needs Mosek
 ```
-
-> **Warning.** Do not run `Pkg.resolve()`/`Pkg.up()` on the root
-> environment: a pre-existing registry compat conflict (SpecialFunctions)
-> makes re-resolution fail. The pinned `Manifest.toml` works as-is.
 
 Loading the package in a script:
 
 ```julia
-import Pkg; Pkg.activate("path/to/Opt_Methods"; io = devnull)
-include("path/to/Opt_Methods/PEPDesign/src/PEPDesign.jl")
+import Pkg; Pkg.activate("path/to/PEP_NumericalDesign"; io = devnull)
+include("path/to/PEP_NumericalDesign/src/PEPDesign.jl")
 using .PEPDesign
 ```
 
@@ -125,7 +117,7 @@ nonlinear SDP in `(λ, ω)` directly (SSDP).
                                           └────────────────────┘
 ```
 
-Include order (see `src/PEPDesign.jl`): `params → gram → compile → solve →
+Include order (see `src/PEPDesign.jl`): `params → gram → compile → facial_reduction → solve →
 sensitivity → classes → policies → design/{oracle,trace,fom,som,ssdp,hrdp} →
 methods/{ogd,item,igdm}`.
 
@@ -312,7 +304,11 @@ GenericBackend(factory; attributes = Pair{String,Any}[], verbose = false)
 ### Solving
 
 ```julia
-sol = solve_pep(cp::CompiledPEP, η; backend = MosekBackend(), warn = true)
+sol = solve_pep(cp::CompiledPEP, η;
+                backend = MosekBackend(), warn = true,
+                facial_reduction = :none,
+                fr_rtol = 1e-9, fr_atol = 1e-11,
+                cert_tol = 1e-7, gap_tol = 1e-6)
 ```
 
 `PEPSolution` fields:
@@ -325,6 +321,8 @@ sol = solve_pep(cp::CompiledPEP, η; backend = MosekBackend(), warn = true)
 | `psd_duals` | one KKT matrix Λ_b ⪰ 0 per LMI block (aligned with `CompiledPEP.psd`) |
 | `obj_duals` | epigraph weights γ_k (`[1.0]` for single objectives; Σγ = 1 for max-min) |
 | `status` | `MOI.OPTIMAL`, `MOI.SLOW_PROGRESS`, … |
+| `diagnostics` | primal/dual status, raw status, relative gap, original-space residuals, and `certified` flag |
+| `reduction` | mode, original/reduced dimensions, exposing rank, eliminated rows, and basis `Z` |
 
 > **Dual sign convention.** JuMP/MOI duals of *maximization* problems are the
 > negatives of classic KKT multipliers for scalar rows; `solve_pep` negates
@@ -333,6 +331,48 @@ sol = solve_pep(cp::CompiledPEP, η; backend = MosekBackend(), warn = true)
 > finite-difference-validated (`dev/parity_ogd.jl`,
 > `dev/test_frontend_classes.jl`). If you bypass `solve_pep`, handle this
 > yourself.
+
+### Explicit facial reduction
+
+Facial reduction is optional and disabled by default. Enable it with
+`facial_reduction = :explicit` when pure-Gram equalities make the SDP
+degenerate:
+
+```julia
+info = facial_reduction_info(cp, η; mode = :explicit)
+sol = solve_pep(cp, η; facial_reduction = :explicit)
+
+facial_reduction_applied(sol.reduction)   # true when dim(H) < dim(G)
+sol.diagnostics.certified                # validate before using sol.obj
+```
+
+The implementation uses the implication
+
+```
+tr(A G) = 0,  A ⪧ 0,  G ⪧ 0  ⇒  range(A) ⊆ ker(G).
+```
+
+For all existing equalities with zero function-value and constant terms, it
+assembles `A(η)`, keeps those that are PSD within `fr_atol + fr_rtol‖A‖`,
+stacks their positive-eigenvalue directions, and computes an orthonormal
+basis `Z` of the common nullspace. The solver then substitutes `G = Z H Z'`
+and removes only the exposing rows made identically zero. This is an exact
+one-step *partial* facial reduction: it does not search for hidden exposing
+vectors by solving auxiliary facial-reduction SDPs.
+
+The reconstructed `G` is checked against every original scalar constraint
+and PSD block. A value is certified only when the termination, primal and
+dual statuses are acceptable, the relative gap is below `gap_tol`, and the
+maximum original-space scalar/cone violations are below `cert_tol`.
+`MOI.SLOW_PROGRESS` alone is therefore never treated as proof that the value
+is valid.
+
+The construction is the PSD specialization of facial reduction introduced
+by J. M. Borwein and H. Wolkowicz, *Regularizing the abstract convex program*,
+J. Math. Anal. Appl. 83(2), 1981, and follows the explicit/partial reduction
+viewpoint of F. Permenter and P. A. Parrilo, *Partial facial reduction:
+simplified, equivalent SDPs via approximations of the PSD cone*, Math.
+Program. 171, 2018.
 
 ## 8. Sensitivities
 
@@ -453,6 +493,12 @@ W, sol, η = pep_value(dp, ω)                        # one SDP solve
 gω, Hω = pep_grad_hess(dp, ω, η, sol; hess = true)  # free (contractions)
 ```
 
+Use `facial_reduction = :explicit` in the constructor to reduce every PEP
+evaluation. In that mode, `eval_all(dp, ω; hess=false)` computes a central
+finite-difference gradient in policy space using only certified reduced
+values (`1 + 2 * length(ω)` PEP solves). This avoids assigning arbitrary duals to
+eliminated exposing equalities. Frozen-certificate Hessians are unavailable.
+
 ### First-order — `design_fom`
 
 ```julia
@@ -463,7 +509,9 @@ tr = design_fom(dp, ω0; iters, steps, method = :SD,
 - `steps`: vector or function `t → Float64`. `:SD` = normalized steepest
   descent (`0.1/√t` is a good default); `:Adam` uses `steps` as the learning
   rate (constant `1e-3`–`1e-2` typical).
-- Cost: exactly 1 SDP solve per iteration (+1 for the initial point).
+- Cost without facial reduction: exactly 1 SDP solve per iteration (+1 for
+  the initial point). Explicit facial reduction uses `1 + 2 * length(ω)` solves
+  per value/gradient evaluation.
 
 ### Second-order — `design_som`
 
@@ -478,6 +526,9 @@ recovers plain Armijo, `< 0` uses |f(ω₀)|) or Strong Wolfe (`:Wolfe`,
 bracketing + zoom). Line searches cost extra SDP solves (typically 2–5 per
 iteration); a per-ω evaluation cache avoids duplicates. Degenerate points
 (solver failures) return +∞ and are backtracked over, never crash.
+
+`design_som` requires certificate curvature and rejects facially reduced
+objectives. Use `design_fom` when reduction is enabled.
 
 ### Traces
 
@@ -501,6 +552,8 @@ min  c0_obj − Σ_c λ_c c0_c   s.t.  Σ_c λ_c A_c(η(ω)) − C(η(ω)) ⪰ 0
 
 Single-piece objectives only, and **no PSD (LMI) blocks** (the LMI-dual NSDP
 is not implemented; a clear error is raised — use FOM/SOM instead).
+`design_ssdp` also rejects facial reduction because it optimizes the original
+dual NSDP and needs the eliminated equality multipliers.
 
 - Initialization: one PEP solve at ω0 gives a feasible ϑ0 and multipliers
   `(G0, y0) = (Gram, F)`.
@@ -536,6 +589,8 @@ tr = design_som(ho, ω0; iters = 30)        # or design_fom
   or a vector of starts; `method ∈ (:som, :fom, :both)` keeps the best value
   over starts × methods (multistart strongly recommended — single-start SOM
   can stall on kinks).
+- With `facial_reduction = :explicit`, use `method = :fom`. The option and
+  all certification tolerances propagate to every horizon.
 
 Metrics:
 
@@ -557,7 +612,7 @@ Evaluations are stochastic; pair with `design_fom` (line-search-free), not
 
 ## 13. Adding a new method
 
-Create `PEPDesign/src/methods/<name>.jl` (~40–80 lines):
+Create `src/methods/<name>.jl` (~40–80 lines):
 
 ```julia
 function myalg_pep(N::Int, L::Real)
@@ -634,11 +689,12 @@ Closed-form derivatives: subtype `AbstractPolicy`, implement
 ## 15. Validation suite
 
 ```
-julia --project=. --threads=4 PEPDesign/dev/run_all_tests.jl
+julia --project=. --threads=4 dev/run_all_tests.jl
 ```
 
 | Script | Checks |
 |---|---|
+| `test/facial_reduction.jl` | explicit face discovery; redundant, indefinite, and full-face cases; original-space residual/gap certification; value parity; finite-difference FOM and unsupported second-order paths |
 | `test_policies.jl` | FD on Jacobians/Hessians of every policy; IGDM structured-policy sparsity |
 | `test_frontend_classes.jl` | one known tight rate per class family (GD on 𝓕_{0,L}/𝓕_{μ,L}/quadratics, PPA, resolvent, exact line search); FD of the LMI-dual envelope gradient; combination & step smoke tests |
 | `parity_ogd.jl` | value parity vs frozen legacy (1e-9); exact matrix FD identities; ∇W vs FD |
@@ -679,9 +735,10 @@ Rules of thumb:
 |---|---|
 | `ERROR: point coefficients must remain affine in η` | Coefficient product in an iterate (ITEM-like). Declare the intermediate iterate with `point!` and add `add_eq!(m, sqnorm(residual))`. |
 | Gradients disagree with finite differences | (a) At a kink (nonunique certificate — common for ITEM/IGDM): expected; the gradient is a valid subgradient. Test with the synthetic-certificate contraction identity instead. (b) Custom solver path: check the dual sign normalization (§7). |
-| `SLOW_PROGRESS` status | Degenerate SDP (residual equalities). Usually still ~1e-6-accurate. Improve by pinning points via zero `PointExpr()`s; tighten `feas_tol`. |
+| `SLOW_PROGRESS` status | Degenerate SDP (often residual equalities). Inspect `sol.diagnostics`; do not accept the objective unless `certified` is true. Pin zero points, tighten `feas_tol`, or opt into `facial_reduction=:explicit`. |
+| Facial reduction removes no dimensions | No existing pure-Gram equality exposes a PSD face at this η, or eigenvalues fall below `fr_atol + fr_rtol‖A‖`. Inspect `facial_reduction_info`; do not loosen tolerances enough to classify an indefinite matrix as PSD. |
+| SOM/SSDP errors with facial reduction | Expected: reduced equality duals are nonunique. Use `design_fom`, which differentiates certified reduced values. |
 | SOM stalls above the optimum | Kinked landscape + frozen-certificate model. Use multistart (`compute_wstar(...; method = :both)`), or a FOM polish. |
 | SSDP steps rejected immediately | Merit penalty ρ too small relative to multipliers, or `:full` mode over-regularizing. Increase `ρ`, or use `hessian_mode = :block`. |
-| `Pkg.resolve` fails on the root env | Known registry conflict; the pinned Manifest works. Don't resolve/up. |
 | Everything slow under `@threads` | Mosek over-subscription — ensure `MosekBackend(threads = 1)` (default). |
 | `W_final` from SSDP ≠ dual objective | Gap = remaining KKT residual; increase `iters` or loosen `tol` expectations. Check `kkt_hist`. |

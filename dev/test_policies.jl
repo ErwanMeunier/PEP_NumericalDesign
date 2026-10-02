@@ -1,9 +1,9 @@
 # Policy-layer sanity: Jacobians/Hessians of every catalog family vs
 # ForwardDiff-free finite differences, plus structured IGDM policies.
-# Run: julia --project=. PEPDesign/dev/test_policies.jl
+# Run: julia --project=. dev/test_policies.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 include(joinpath(@__DIR__, "..", "src", "PEPDesign.jl"))
 using .PEPDesign

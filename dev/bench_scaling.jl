@@ -1,8 +1,8 @@
 # Timing probe at large horizons: compile / solve / gradient for OGD and IGDM.
-# Run: julia --project=. PEPDesign/dev/bench_scaling.jl
+# Run: julia --project=. dev/bench_scaling.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 include(joinpath(@__DIR__, "..", "src", "PEPDesign.jl"))
 using .PEPDesign

@@ -1,8 +1,8 @@
 # Parity and correctness checks for the OGD path: new PEPDesign vs legacy src/.
-# Run from the repo root:  julia --project=. PEPDesign/dev/parity_ogd.jl
+# Run from the repo root:  julia --project=. dev/parity_ogd.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 using JuMP, Mosek, MosekTools, LinearAlgebra, SparseArrays, Random, Test
 

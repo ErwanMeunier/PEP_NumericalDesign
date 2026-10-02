@@ -1,8 +1,8 @@
 # Smoke test: FOM and SOM design on OGD with the constant policy.
-# Run from repo root:  julia --project=. PEPDesign/dev/smoke_design.jl
+# Run from repo root:  julia --project=. dev/smoke_design.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 include(joinpath(@__DIR__, "..", "src", "PEPDesign.jl"))
 using .PEPDesign

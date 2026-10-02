@@ -19,6 +19,7 @@ using Statistics
 include("params.jl")
 include("gram.jl")
 include("compile.jl")
+include("facial_reduction.jl")
 include("solve.jl")
 include("sensitivity.jl")
 include("classes.jl")
@@ -46,7 +47,9 @@ export PEPModel, PointExpr, FVal, QExpr,
 # Compilation
 export CompiledPEP, ParamMatrix, CompiledPSD, compile, assemble, dmat, d2mat, trprod
 # Solving
-export SDPBackend, MosekBackend, GenericBackend, PEPSolution, solve_pep
+export SDPBackend, MosekBackend, GenericBackend,
+    FacialReductionInfo, facial_reduction_info, facial_reduction_applied,
+    SolveDiagnostics, PEPSolution, solve_pep
 # Sensitivity
 export grad_hess_eta, pullback
 # Frontend: oracles and combinations (ported from PEPit.jl, MIT)

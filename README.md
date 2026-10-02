@@ -25,7 +25,7 @@ and policy parameters — with zero runtime overhead.
 | [docs/manual.md](docs/manual.md) | **Full package manual**: installation, math background, complete API reference (DSL, compilation, solving, sensitivities, policies, methods, FOM/SOM/SSDP/HRDP), extension guides, troubleshooting |
 | [docs/experiments.md](docs/experiments.md) | Paper experiments: what each script computes, outputs, reproducibility |
 | [docs/cluster.md](docs/cluster.md) | **SLURM / CECI guide**: setup (modules, depot, Mosek license), submission, resources, monitoring, resuming, troubleshooting |
-| [../CONTRIBUTING.md](../CONTRIBUTING.md) | Repository-level architecture and coding rules |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow, architecture, and validation rules |
 
 ## How it works
 
@@ -57,7 +57,7 @@ No computer-algebra system, no runtime AD, no hand-coded derivative matrices.
 ## Quickstart
 
 ```julia
-include("PEPDesign/src/PEPDesign.jl"); using .PEPDesign
+include("src/PEPDesign.jl"); using .PEPDesign
 
 # 1. Compile a built-in method once per horizon (cache and reuse!)
 cp = compile_ogd(30, 1.0, 1.0)              # OGD regret PEP, L = D = 1
@@ -81,6 +81,32 @@ ho = HRDPObjective(N -> compile_ogd(N, 1, 1), ConstantPolicy(), 2:8, Wstar)
 trH = design_som(ho, [0.3]; iters = 20)
 snw(ho, best_point(trH)[1])                 # per-horizon normalized profile
 ```
+
+### Opt-in facial reduction
+
+Residual equalities such as `‖r‖² = 0` can force the Gram matrix onto a
+proper face of the PSD cone and make an otherwise bounded PEP look
+numerically unstable. The explicit facial reducer detects equalities
+`tr(A G) = 0` with `A ⪧ 0`, computes an orthonormal basis `Z` of the exposed
+face, and solves with `G = Z H Z'`, `H ⪧ 0`:
+
+```julia
+sol = solve_pep(cp, η; facial_reduction = :explicit)
+@assert sol.diagnostics.certified
+@show sol.reduction.original_dim sol.reduction.reduced_dim
+
+# Design is first-order in this mode: gradients use certified central
+# differences because eliminated equality duals are not unique.
+dp = DesignProblem(cp, ConstantPolicy(), N;
+                   facial_reduction = :explicit)
+tr = design_fom(dp, [0.2]; iters = 20)
+```
+
+The default is `facial_reduction = :none`, so existing behavior and exact
+dual sensitivities are unchanged. `design_som` and `design_ssdp` deliberately
+reject facially reduced problems; use `design_fom`. See the
+[manual](docs/manual.md#explicit-facial-reduction) for the mathematical scope,
+diagnostics, tolerances, and references.
 
 ## Defining a new method (~15 lines)
 
@@ -131,6 +157,7 @@ otherwise.
 | [src/classes.jl](src/classes.jl) | 𝓕_{μ,L} interpolation generator |
 | [src/frontend/](src/frontend) | high-level layer (from PEPit.jl, MIT): oracles & combinations, 14 function classes, 13 operator classes, 9 primitive steps |
 | [src/compile.jl](src/compile.jl) | exact (A0, A1, A2) extraction → CompiledPEP |
+| [src/facial_reduction.jl](src/facial_reduction.jl) | explicit PSD-face detection and Gram-space parameterization |
 | [src/solve.jl](src/solve.jl) | SDP backends (Mosek default, GenericBackend for others) |
 | [src/sensitivity.jl](src/sensitivity.jl) | envelope gradient (incl. LMI duals), H_cert, policy pullback |
 | [src/policies.jl](src/policies.jl) | policy families (identity, constant, power law, catalog…) |
@@ -145,7 +172,7 @@ otherwise.
 ## Validation
 
 ```
-julia --project=. --threads=4 PEPDesign/dev/run_all_tests.jl
+julia --project=. --threads=4 dev/run_all_tests.jl
 ```
 
 - **OGD**: value parity with legacy at 1e-9; gradients FD-validated. Two
@@ -159,6 +186,10 @@ julia --project=. --threads=4 PEPDesign/dev/run_all_tests.jl
   (GD → LD²/(4N+2), PPA → D²/(4Nγ), resolvent → 1/(1+γμ)², exact line
   search → ((κ−1)/(κ+1))^{2N}, quadratics via LMI) plus FD validation of the
   LMI-dual envelope gradient — [dev/test_frontend_classes.jl](dev/test_frontend_classes.jl).
+- **Facial reduction**: face discovery, redundant/indefinite/full-face cases,
+  original-space feasibility and gap certification, unreduced/reduced value
+  parity, and finite-difference first-order design —
+  [test/facial_reduction.jl](test/facial_reduction.jl).
 - **Performance**: ~4× faster per design iteration than the legacy library
   at N = 10 (compile-once extraction); OGD N = 40 solves in ~19 s.
 
@@ -168,3 +199,6 @@ julia --project=. --threads=4 PEPDesign/dev/run_all_tests.jl
   parallelism (`Threads.@threads` over horizons/policies/starts) scales.
 - Any JuMP SDP solver can be swapped in via `GenericBackend(Clarabel.Optimizer)`
   (license-free) — also the hook for future GPU backends.
+- Treat `MOI.SLOW_PROGRESS` as a status, not a certificate. Inspect
+  `sol.diagnostics.certified`, which also checks primal/dual availability,
+  relative gap, and original-space scalar/cone violations.

@@ -11,6 +11,10 @@ general (certificate held fixed).
 """
 function grad_hess_eta(cp::CompiledPEP, η::AbstractVector{<:Real},
                        sol::PEPSolution; hess::Bool = true)
+    facial_reduction_applied(sol.reduction) &&
+        error("dual sensitivities are unavailable after facial reduction; " *
+              "use DesignProblem(...; facial_reduction=:explicit), whose " *
+              "first-order oracle uses finite differences of certified values")
     p = cp.np
     g = zeros(p)
     H = hess ? zeros(p, p) : zeros(0, 0)

@@ -1,9 +1,9 @@
 # Validate the extracted ITEM dual certificate: PSD dual matrix, F-balance,
 # complementarity — and probe one-sided directional derivatives for kinks.
-# Run: julia --project=. PEPDesign/dev/diag_item_duals.jl
+# Run: julia --project=. dev/diag_item_duals.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 using LinearAlgebra, SparseArrays, Random, Printf
 include(joinpath(@__DIR__, "..", "src", "PEPDesign.jl"))

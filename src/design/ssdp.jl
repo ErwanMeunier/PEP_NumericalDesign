@@ -65,6 +65,10 @@ function design_ssdp(dp::DesignProblem, ω0::AbstractVector{<:Real};
                      σ::Float64 = 1e-4, tol::Float64 = 1e-6,
                      hessian_mode::Symbol = :block, λreg::Float64 = 1e-3,
                      verbose::Bool = false)
+    dp.facial_reduction == :none ||
+        error("design_ssdp is unavailable with facial reduction because " *
+              "eliminated-face original dual multipliers are not recovered; " *
+              "use design_fom instead")
     cp = dp.cp
     length(cp.obj) == 1 ||
         error("design_ssdp supports single-piece objectives only")

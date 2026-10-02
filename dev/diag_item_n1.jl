@@ -1,8 +1,8 @@
 # N=1 ITEM probe: identify the correct (β, δ) index convention against the
-# exact guarantee 1/(1+qA_1). Run: julia --project=. PEPDesign/dev/diag_item_n1.jl
+# exact guarantee 1/(1+qA_1). Run: julia --project=. dev/diag_item_n1.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 using Printf
 include(joinpath(@__DIR__, "..", "src", "PEPDesign.jl"))

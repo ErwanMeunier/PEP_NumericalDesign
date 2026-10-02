@@ -1,9 +1,9 @@
 # Frontend validation: known tight rates per class, LMI-block gradient FD,
 # combination/step smoke tests.
-# Run: julia --project=. PEPDesign/dev/test_frontend_classes.jl
+# Run: julia --project=. dev/test_frontend_classes.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 include(joinpath(@__DIR__, "..", "src", "PEPDesign.jl"))
 using .PEPDesign

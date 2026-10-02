@@ -1,9 +1,9 @@
 # HRDP smoke test: multi-horizon OGD design with the constant policy,
 # transfer metrics, and the sampled estimator.
-# Run: julia --project=. --threads=4 PEPDesign/dev/smoke_hrdp.jl
+# Run: julia --project=. --threads=4 dev/smoke_hrdp.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 include(joinpath(@__DIR__, "..", "src", "PEPDesign.jl"))
 using .PEPDesign

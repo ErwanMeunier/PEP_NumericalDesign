@@ -1,8 +1,8 @@
 # Wall-time comparison: legacy FOM_SOM vs PEPDesign on the OGD path.
-# Run: julia --project=. PEPDesign/dev/bench_vs_legacy.jl
+# Run: julia --project=. dev/bench_vs_legacy.jl
 
 import Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."); io = devnull)
+Pkg.activate(joinpath(@__DIR__, ".."); io = devnull)
 
 using JuMP, Mosek, MosekTools, LinearAlgebra, SparseArrays, Random, Printf
 

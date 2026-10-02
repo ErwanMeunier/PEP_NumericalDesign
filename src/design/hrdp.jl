@@ -17,13 +17,21 @@ struct HRDPObjective{P<:AbstractPolicy,B<:SDPBackend} <: AbstractDesignObjective
 end
 
 function HRDPObjective(compile_fn::Function, policy::AbstractPolicy, H,
-                       Wstar::AbstractDict; backend::SDPBackend = MosekBackend())
+                       Wstar::AbstractDict; backend::SDPBackend = MosekBackend(),
+                       facial_reduction::Symbol = :none,
+                       fr_rtol::Float64 = 1e-9, fr_atol::Float64 = 1e-11,
+                       cert_tol::Float64 = 1e-7, gap_tol::Float64 = 1e-6,
+                       fd_rel_step::Float64 = 1e-4)
     Hs = collect(Int, H)
-    dps = [DesignProblem(compile_fn(N), policy, N, backend) for N in Hs]
+    dps = [DesignProblem(compile_fn(N), policy, N; backend,
+                         facial_reduction, fr_rtol, fr_atol, cert_tol,
+                         gap_tol, fd_rel_step) for N in Hs]
     ws = [Float64(Wstar[N]) for N in Hs]
     all(>(0), ws) || error("all W*_N must be positive")
     return HRDPObjective(dps, Hs, ws)
 end
+
+supports_hessian(ho::HRDPObjective) = all(supports_hessian, ho.dps)
 
 """σ, gradient, frozen-certificate curvature, and solve count at ω."""
 function eval_all(ho::HRDPObjective, ω::AbstractVector{<:Real}; hess::Bool = true)
@@ -32,16 +40,18 @@ function eval_all(ho::HRDPObjective, ω::AbstractVector{<:Real}; hess::Bool = tr
     fs = zeros(n)
     gs = [zeros(κ) for _ in 1:n]
     Hs = [zeros(κ, κ) for _ in 1:n]
+    solves = zeros(Int, n)
     Threads.@threads for i in 1:n
-        f, g, Hm, _ = eval_all(ho.dps[i], ω; hess)
+        f, g, Hm, ns = eval_all(ho.dps[i], ω; hess)
         fs[i] = f / ho.Wstar[i]
         gs[i] = g ./ ho.Wstar[i]
         hess && (Hs[i] = Hm ./ ho.Wstar[i])
+        solves[i] = ns
     end
     f = sum(fs) / n
     g = sum(gs) ./ n
     H = hess ? sum(Hs) ./ n : zeros(0, 0)
-    return f, g, H, n
+    return f, g, H, sum(solves)
 end
 
 """
@@ -89,6 +99,8 @@ struct SampledHRDP{R<:Random.AbstractRNG} <: AbstractDesignObjective
     rng::R
 end
 
+supports_hessian(sh::SampledHRDP) = supports_hessian(sh.ho)
+
 function SampledHRDP(ho::HRDPObjective, r::Int, m::Int;
                      rng::Random.AbstractRNG = Random.default_rng(),
                      weights = nothing)
@@ -109,20 +121,20 @@ function eval_all(sh::SampledHRDP, ω::AbstractVector{<:Real}; hess::Bool = true
     Hm = hess ? zeros(κ, κ) : zeros(0, 0)
     nsolves = 0
     for i in sh.prefix
-        fi, gi, Hi, _ = eval_all(ho.dps[i], ω; hess)
+        fi, gi, Hi, ns = eval_all(ho.dps[i], ω; hess)
         f += fi / ho.Wstar[i]
         g .+= gi ./ ho.Wstar[i]
         hess && (Hm .+= Hi ./ ho.Wstar[i])
-        nsolves += 1
+        nsolves += ns
     end
     ks = [sh.tail[findfirst(>=(u), cumsum(sh.p))] for u in rand(sh.rng, sh.m)]
     for (j, i) in enumerate(ks)
         w = 1.0 / (sh.m * sh.p[findfirst(==(i), sh.tail)])
-        fi, gi, Hi, _ = eval_all(ho.dps[i], ω; hess)
+        fi, gi, Hi, ns = eval_all(ho.dps[i], ω; hess)
         f += w * fi / ho.Wstar[i]
         g .+= w .* gi ./ ho.Wstar[i]
         hess && (Hm .+= w .* Hi ./ ho.Wstar[i])
-        nsolves += 1
+        nsolves += ns
     end
     return f / n, g ./ n, hess ? Hm ./ n : Hm, nsolves
 end
@@ -137,12 +149,21 @@ Horizon-wise optimal values W*_N by per-horizon design (threaded over N).
 """
 function compute_wstar(compile_fn::Function, H; policy = IdentityPolicy(),
                        ω0_fn::Function, iters::Int = 50,
-                       backend::SDPBackend = MosekBackend(), method::Symbol = :both)
+                       backend::SDPBackend = MosekBackend(),
+                       method::Symbol = :both,
+                       facial_reduction::Symbol = :none,
+                       fr_rtol::Float64 = 1e-9, fr_atol::Float64 = 1e-11,
+                       cert_tol::Float64 = 1e-7, gap_tol::Float64 = 1e-6,
+                       fd_rel_step::Float64 = 1e-4)
+    facial_reduction != :none && method in (:som, :both) &&
+        error("facial reduction in compute_wstar requires method=:fom")
     Hs = collect(Int, H)
     vals = zeros(length(Hs))
     Threads.@threads for i in eachindex(Hs)
         N = Hs[i]
-        dp = DesignProblem(compile_fn(N), policy, N, backend)
+        dp = DesignProblem(compile_fn(N), policy, N; backend,
+                           facial_reduction, fr_rtol, fr_atol, cert_tol,
+                           gap_tol, fd_rel_step)
         starts = ω0_fn(N)
         starts isa AbstractVector{<:AbstractVector} || (starts = [starts])
         best = Inf
