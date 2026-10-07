@@ -10,7 +10,7 @@ References:
 
 Parametric Performance Estimation and step-size policy design — the toolbox
 accompanying *"Principled Robust Design of First-Order Methods via
-Parameterized Step-Size Policies"* which should be released in September 2026. 
+Parameterized Step-Size Policies"* which should be released in October 2026. 
 
 Successor of the legacy `src/` (FOM_SOM) library. Given a first-order method
 written as a short algebraic recurrence, PEPDesign **automatically derives**
