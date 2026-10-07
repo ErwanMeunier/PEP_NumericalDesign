@@ -1,5 +1,7 @@
 TOOLBOX UNDER DEVELOPMENT with a mix of AI and Human generated content. 
 
+HUMAN AUTHOR: Erwan Meunier - erwan.meunier@uclouvain.be
+
 The automated formulation of PEP problems is directly taken from https://github.com/PerformanceEstimation/PEPit.jl 
 
 References: 
