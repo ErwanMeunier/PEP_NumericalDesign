@@ -33,7 +33,9 @@ include("design/trace.jl")
 include("design/fom.jl")
 include("design/som.jl")
 include("design/ssdp.jl")
+include("design/slm.jl")
 include("design/hrdp.jl")
+include("methods/gd.jl")
 include("methods/ogd.jl")
 include("methods/item.jl")
 include("methods/igdm.jl")
@@ -88,10 +90,14 @@ export DesignProblem, pep_value, pep_grad_hess, eval_all,
     AbstractDesignObjective,
     DesignTrace, best_point, design_fom, design_som,
     SSDPTrace, design_ssdp,
+    SLMTangent, add_slm_tangent!, design_slm,
     HRDPObjective, SampledHRDP, snw, wgc, generalization_ratio, compute_wstar
 # Methods
-export ogd_pep, compile_ogd,
+export gd_pep, compile_gd,
+    ogd_pep, compile_ogd,
     item_pep, compile_item, item_optimal_params,
+    item_fs_pep, compile_item_fs, item_fs_dof, item_fs_hindex, item_fs_cindex,
+    item_fs_map, item_reference, ITEMPolicy,
     igdm_pep, compile_igdm, igdm_flat_index, igdm_dof, igdm_diag_indices,
     igdm_hmem, igdm_diagonal_policy,
     IGDMKMemoryPolicy, IGDMStationaryPolicy, IGDMLagPolicy,

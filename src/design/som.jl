@@ -38,12 +38,14 @@ function design_som(dp::AbstractDesignObjective, ω0::AbstractVector{<:Real};
     κ = length(ω0)
     ev = PEPEvaluator(dp, κ; hess = true)
     c1 = 1e-4
+    t0 = time()
 
     ω = collect(Float64, ω0)
     ω_hist = [copy(ω)]
     refresh!(ev, ω)
     values = [ev.f]
     solves_hist = [ev.nsolves]
+    time_hist = [time() - t0]
 
     σ_eff = sigma_met < 0.0 ? abs(ev.f) : sigma_met
     f_window = fill(ev.f, max(1, M_met))
@@ -124,7 +126,9 @@ function design_som(dp::AbstractDesignObjective, ω0::AbstractVector{<:Real};
         push!(ω_hist, copy(ω))
         push!(values, ev.f)
         push!(solves_hist, ev.nsolves)
+        push!(time_hist, time() - t0)
         verbose && @info "SOM iter $k" W = ev.f step = α
     end
-    return DesignTrace(ω_hist, values, solves_hist, ev.nsolves)
+    return DesignTrace(ω_hist, values, solves_hist, ev.nsolves,
+                       zeros(Int, length(values)), time_hist)
 end

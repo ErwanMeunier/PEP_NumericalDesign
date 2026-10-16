@@ -17,12 +17,14 @@ function design_fom(dp::AbstractDesignObjective, ω0::AbstractVector{<:Real};
     step_at = steps isa AbstractVector ? (t -> Float64(steps[t])) :
                                          (t -> Float64(steps(t)))
     ev = PEPEvaluator(dp, κ; hess = false)
+    t0 = time()
 
     ω = collect(Float64, ω0)
     ω_hist = [copy(ω)]
     refresh!(ev, ω)
     values = [ev.f]
     solves_hist = [ev.nsolves]
+    time_hist = [time() - t0]
 
     m = zeros(κ)   # Adam first moment
     v = zeros(κ)   # Adam second moment
@@ -45,7 +47,9 @@ function design_fom(dp::AbstractDesignObjective, ω0::AbstractVector{<:Real};
         push!(ω_hist, copy(ω))
         push!(values, ev.f)
         push!(solves_hist, ev.nsolves)
+        push!(time_hist, time() - t0)
         verbose && @info "FOM iter $t" W = ev.f norm_g = ng
     end
-    return DesignTrace(ω_hist, values, solves_hist, ev.nsolves)
+    return DesignTrace(ω_hist, values, solves_hist, ev.nsolves,
+                       zeros(Int, length(values)), time_hist)
 end

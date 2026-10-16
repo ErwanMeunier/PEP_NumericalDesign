@@ -4,15 +4,24 @@
     DesignTrace
 
 History of a design run. `values[k] = W(ω_hist[k])`; `solves_hist[k]` is the
-cumulative SDP-solve count when ω_hist[k] was recorded (the fair comparison
+cumulative PEP-solve count when ω_hist[k] was recorded (the fair comparison
 budget across methods and policies); `nsolves` is the run total.
+`tangent_hist[k]` counts the cumulative tangent (linearized) SDPs of
+SLM-type methods (zero for FOM/SOM) and `time_hist[k]` is the elapsed wall
+time in seconds.
 """
 struct DesignTrace
     ω_hist::Vector{Vector{Float64}}
     values::Vector{Float64}
     solves_hist::Vector{Int}
     nsolves::Int
+    tangent_hist::Vector{Int}
+    time_hist::Vector{Float64}
 end
+
+DesignTrace(ω_hist, values, solves_hist, nsolves) =
+    DesignTrace(ω_hist, values, solves_hist, nsolves,
+                zeros(Int, length(solves_hist)), fill(NaN, length(solves_hist)))
 
 """Best visited point: `(ω_best, W_best)`."""
 function best_point(tr::DesignTrace)

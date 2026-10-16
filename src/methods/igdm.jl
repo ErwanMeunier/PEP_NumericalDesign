@@ -18,13 +18,24 @@ igdm_dof(N::Int) = (N * (N + 1)) ÷ 2
 igdm_diag_indices(N::Int) = [igdm_flat_index(n, n) for n in 1:N]
 
 """
-    igdm_pep(N, L, ε; D=1.0, objective=:last_grad) -> (PEPModel, β::Vector{PAff})
+    igdm_pep(N, L, ε; D=1.0, objective=:last_grad, encoding=:residual)
+        -> (PEPModel, β::Vector{PAff})
 
 Build the parametric IGDM PEP. `objective = :last_grad` maximizes ‖g_{N+1}‖²
 (legacy convention); `:min_grad` maximizes min_{k=2..N+1} ‖g_k‖² (epigraph).
+
+`encoding = :residual` (paper appendix) keeps x_2..x_{N+1} as Gram points and
+imposes ‖x_{n+1} − x_n + Σ_k β_{n,k} d_k‖² = 0 (constraints quadratic in β,
+nonzero frozen curvature). `encoding = :substitution` (Kamri's FIGD
+encoding) substitutes x_{n+1} = x_n − Σ_k β_{n,k} d_k, so every constraint is
+affine in β (smaller Gram basis [x_1, g_1..g_{N+1}, d_1..d_N]; zero frozen
+curvature). Both encodings have the same optimal value.
 """
 function igdm_pep(N::Int, L::Real, ε::Real; D::Real = 1.0,
-                  objective::Symbol = :last_grad)
+                  objective::Symbol = :last_grad, encoding::Symbol = :residual)
+    encoding in (:residual, :substitution) ||
+        error("unknown IGDM encoding :$encoding (use :residual or :substitution)")
+    encoding == :substitution && return _igdm_pep_substitution(N, L, ε; D, objective)
     m = PEPModel()
     β = coeffs!(m, igdm_dof(N))
     βnk(n, k) = β[igdm_flat_index(n, k)]
@@ -57,12 +68,40 @@ function igdm_pep(N::Int, L::Real, ε::Real; D::Real = 1.0,
     return m, β
 end
 
+function _igdm_pep_substitution(N::Int, L::Real, ε::Real; D::Real, objective::Symbol)
+    m = PEPModel()
+    β = coeffs!(m, igdm_dof(N))
+    βnk(n, k) = β[igdm_flat_index(n, k)]
+    fobj = SmoothConvexFunction(m; L = L, name = "f")
+    x1 = point!(m; name = "x1")
+    x = Vector{PointExpr}(undef, N + 1)
+    g = Vector{PointExpr}(undef, N + 1)
+    d = Vector{PointExpr}(undef, N)
+    f = Vector{QExpr}(undef, N + 1)
+    x[1] = x1
+    for n in 1:N
+        d[n], g[n], f[n] = inexact_gradient!(fobj, x[n], ε; notion = :relative)
+        x[n + 1] = x[n] - sum(βnk(n, k) * d[k] for k in 1:n)
+    end
+    g[N + 1], f[N + 1] = oracle!(fobj, x[N + 1])
+    add_oracle_point!(fobj, PointExpr(), PointExpr(), 0.0; stationary = true)
+    add_le!(m, f[1] - D; name = "init")
+    if objective == :last_grad
+        objective_max!(m, sqnorm(g[N + 1]))
+    elseif objective == :min_grad
+        objective_maxmin!(m, [sqnorm(g[k]) for k in 2:(N + 1)])
+    else
+        error("unknown IGDM objective :$objective")
+    end
+    return m, β
+end
+
 """
-    compile_igdm(N, L, ε; D=1.0, objective=:last_grad) :: CompiledPEP
+    compile_igdm(N, L, ε; D=1.0, objective=:last_grad, encoding=:residual) :: CompiledPEP
 """
 compile_igdm(N::Int, L::Real, ε::Real; D::Real = 1.0,
-             objective::Symbol = :last_grad) =
-    compile(igdm_pep(N, L, ε; D, objective)[1])
+             objective::Symbol = :last_grad, encoding::Symbol = :residual) =
+    compile(igdm_pep(N, L, ε; D, objective, encoding)[1])
 
 """
     igdm_hmem(ε) 
