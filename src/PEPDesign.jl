@@ -35,6 +35,7 @@ include("design/som.jl")
 include("design/ssdp.jl")
 include("design/slm.jl")
 include("design/hrdp.jl")
+include("design/transfer.jl")
 include("methods/gd.jl")
 include("methods/ogd.jl")
 include("methods/item.jl")
@@ -88,10 +89,11 @@ export AbstractPolicy, IdentityPolicy, ConstantPolicy, FunctionPolicy,
 # Design
 export DesignProblem, pep_value, pep_grad_hess, eval_all,
     AbstractDesignObjective,
-    DesignTrace, best_point, design_fom, design_som,
+    DesignTrace, best_point, relative_advantage, design_fom, design_som,
     SSDPTrace, design_ssdp,
     SLMTangent, add_slm_tangent!, design_slm,
-    HRDPObjective, SampledHRDP, snw, wgc, generalization_ratio, compute_wstar
+    HRDPObjective, SampledHRDP, snw, wgc, generalization_ratio, compute_wstar,
+    assess_transfer
 # Methods
 export gd_pep, compile_gd,
     ogd_pep, compile_ogd,

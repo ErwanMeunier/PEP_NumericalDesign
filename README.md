@@ -84,6 +84,42 @@ trH = design_som(ho, [0.3]; iters = 20)
 snw(ho, best_point(trH)[1])                 # per-horizon normalized profile
 ```
 
+### Stationary lag mappings and reuse at longer horizons
+
+`IGDMStationaryPolicy(K, base)` applies **any scalar policy along the lag
+axis**, repeating its weights at every iteration. The default
+`IGDMStationaryPolicy(K)` still has one free weight per lag. For example:
+
+```julia
+pol = IGDMStationaryPolicy(4, PowerLawPolicy())
+# beta[n,n-lag] = a / ((lag+1)^b + c), lag=0:4; zero beyond lag 4
+# The same API accepts ConstantPolicy(), dct_policy(3), FunctionPolicy(...), etc.
+```
+
+Learn parameters once, then assess the **unchanged parameters** at larger
+horizons without optimizing again:
+
+```julia
+compiler = N -> compile_gd(N, 1.0)
+pol = dct_policy(2)
+tr = design_slm(DesignProblem(compiler(5), pol, 5), [1.0, 0.0, 0.0]; iters=50)
+omega, _ = best_point(tr)
+reused = assess_transfer(compiler, pol, omega, 5, [6, 10])
+
+# Optional expensive comparator, separate from the cost of reuse:
+compared = assess_transfer(compiler, pol, omega, 5, [6, 10];
+                          free_starts=N -> [ones(N), fill(1.5, N)], iters=50)
+[(r.N, r.reuse_value, r.free_best_value, r.ratio) for r in compared]
+```
+
+Reuse costs one PEP evaluation per target for assessment; generating the
+steps alone requires no SDP. DCT is reevaluated at the target horizon (so
+earlier steps can change); stationary IGDM keeps the **same memory K** and
+lag weights. Free baselines are best-found local designs, not proven
+optima, and good transfer is measured rather than guaranteed. See the
+[manual](docs/manual.md#reusing-a-single-horizon-design-without-redesign) and
+the compute-only [reuse experiment](experiments/exp5_horizon_reuse.jl).
+
 ### Opt-in facial reduction
 
 Residual equalities such as `‖r‖² = 0` can force the Gram matrix onto a

@@ -431,7 +431,32 @@ policy_label(pol)                            # display name
 | `igdm_diagonal_policy(base)` | κ(base) | memoryless: β_{n,n} = base(ω)[n] |
 | `IGDMKMemoryPolicy(K)` | Σₙ min(n, K+1) | free coefficients on the last K+1 lags |
 | `IGDMStationaryPolicy(K)` | K+1 | shift-invariant β_{n,n−ℓ} = ω̄_ℓ |
+| `IGDMStationaryPolicy(K, base)` | nparams(base, K+1) | one shared scalar mapping along the lag axis |
 | `IGDMLagPolicy(K, base)` | (K+1)·κ(base) | one independent schedule per lag |
+
+For a stationary mapping, evaluate `base` at length **K+1**, then repeat its
+lag weights:
+
+```
+s = evaluate_policy(base, omega, K+1)[1]
+beta[n,n-lag] = s[lag+1]   for lag=0:min(K,n-1)
+beta[n,k] = 0             for n-k > K
+```
+
+The base's index 1 is lag 0 (the current gradient). Thus `PowerLawPolicy()`
+means `a/((lag+1)^b+c)`, while
+`FunctionPolicy((w,j,H) -> w[1]*w[2]^(j-1), 2)` describes geometric lag
+weights. All scalar catalog families and custom scalar mappings work;
+the wrapper propagates their Jacobians and per-coefficient Hessians.
+`IGDMStationaryPolicy(K)` is backward compatible with
+`IGDMStationaryPolicy(K, IdentityPolicy())`.
+
+This differs from `IGDMLagPolicy`: that policy gives each lag an independent
+schedule **over iteration time**. A constant base there recovers freely
+chosen stationary weights; a constant base in `IGDMStationaryPolicy` ties
+all lag weights to one common value. Keep K fixed when transferring to
+longer horizons; even horizon-dependent bases such as DCT then keep the
+same lag weights, since their evaluation length remains K+1.
 
 ## 10. Built-in methods
 
@@ -609,6 +634,77 @@ tr = design_fom(sh, ω0; iters, steps)                # unbiased ⇒ use SGD-sty
 
 Evaluations are stochastic; pair with `design_fom` (line-search-free), not
 `design_som`.
+
+### Reusing a single-horizon design without redesign
+
+For two design traces on the same problem, `relative_advantage(free, prior;
+axis=:time)` or `axis=:iterations` aligns their best-so-far values and
+returns `(best_free-best_prior)/best_free`. Positive favors the prior.
+Iteration 0 is the initial evaluation and rejected steps count as updates.
+The default grid covers only the shared observed interval; explicitly
+requested out-of-range budgets return `missing`. `axis=:solves` also
+supports total PEP+tangent costs. This is an empirical comparison, not an
+optimality gap. Use `design_slm(...; require_certified=true)` when measuring
+such curves so uncertified PEP values cannot become reported incumbents.
+
+`assess_transfer` in `src/design/transfer.jl` is independent of HRDP. Supply
+parameters already learned at `N_train`, a compiler, a policy, and target
+horizons. It evaluates `alpha(omega_N, M)` without any optimization, padding,
+fitting, or alteration of `omega_N`.
+
+```julia
+K, N_train = 2, 5
+compiler = N -> compile_igdm(N, 1.0, 0.3; objective=:min_grad,
+                            encoding=:substitution)
+pol = IGDMStationaryPolicy(K)  # or IGDMStationaryPolicy(K, PowerLawPolicy())
+tr = design_slm(DesignProblem(compiler(N_train), pol, N_train),
+                [1.0, 0.0, 0.0]; iters=50)
+omega_N, _ = best_point(tr)
+rows = assess_transfer(compiler, pol, omega_N, N_train, [6, 10])
+```
+
+Each row contains `N`, `source_N`, a copy of `omega`, generated `coefficients`,
+`reuse_value`, `reuse_solution` (including certification diagnostics),
+`reuse_seconds`, and `compile_seconds`. Only the target PEPs are solved:
+one per target for reuse. If only step sizes are needed, call
+`evaluate_policy(pol, omega_N, M)[1]`, with **no PEP solve**.
+
+An optional fresh free-step comparator is deliberately more expensive:
+
+```julia
+starts(M) = [[k == n ? h : 0.0 for n in 1:M for k in max(1,n-K):n]
+             for h in (1.0, igdm_hmem(0.3))]
+rows = assess_transfer(compiler, pol, omega_N, N_train, [6, 10];
+                       free_policy=IGDMKMemoryPolicy(K), free_starts=starts,
+                       iters=100, max_time=300.0)
+[(r.N, r.reuse_value, r.free_best_value, r.ratio) for r in rows]
+```
+
+- Free optimization uses SLM, with the stated iteration/time budget **per
+  start**. Time limits are soft (checked between iterations).
+- Here the baseline frees every coefficient within the same K-memory
+  band. The default `free_policy=IdentityPolicy()` instead frees **all**
+  compiled coefficients; supply correspondingly sized starts.
+- The baseline does not silently warm-start from the reused solution.
+  Explicitly use `rows[i].coefficients` as an identity-policy start if a
+  separate free-polishing experiment is desired.
+- Rows also retain `free_best_value`, `free_omega`, `free_solution`,
+  `free_runs` (traces and stats), `free_seconds`, `free_pep_solves`, and
+  `free_tangent_solves`. Free solve counts include one final verification
+  PEP per start. Compilation and one-off source-training costs are separate.
+- `ratio = reuse_value / free_best_value` compares **best-found** designs,
+  not proven optima. It can be below 1; do not clip it or call it an
+  optimality gap. Without a comparator the ratio/free value are `missing`.
+- Only numerically certified, finite PEP values are reported. Failures
+  raise an error with diagnostics rather than becoming successful rows.
+
+The same assessment API works with scalar, product, mapped, and structured
+policies whose parameter vector remains valid at the target horizons.
+It rejects dimension mismatches rather than extrapolating raw free weights.
+For horizon-dependent mappings such as DCT, reevaluation at M can change
+the earlier steps. This is **horizon transfer**, not a prefix-preserving
+anytime guarantee. Stationary lag mappings keep K and the base evaluation
+length K+1 fixed. Transfer quality remains an empirical question.
 
 ## 13. Adding a new method
 

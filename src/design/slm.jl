@@ -222,13 +222,17 @@ function _damped_bfgs!(B::Matrix{Float64}, s::Vector{Float64},
 end
 
 # Safe PEP evaluation: (W, sol) or (Inf, nothing) on solver failure.
-function _safe_pep(dp::DesignProblem, ω)
+function _safe_pep(dp::DesignProblem, ω; require_certified::Bool = false)
     try
         W, sol, _ = pep_value(dp, ω)
-        isfinite(W) || return Inf, nothing
+        if !isfinite(W) || (require_certified && !sol.diagnostics.certified)
+            @warn "SLM rejected an invalid PEP evaluation" W status = sol.status diagnostics = sol.diagnostics
+            return Inf, nothing
+        end
         return W, sol
     catch err
         err isa InterruptException && rethrow()
+        @warn "SLM PEP evaluation failed" exception = (err, catch_backtrace())
         return Inf, nothing
     end
 end
@@ -237,7 +241,7 @@ end
     design_slm(dp, ω0; iters=1000, Δ0=100.0, hessian=:none, ρ_good=0.9,
                ρ_bad=0.1, tolW=1e-7, tolstep=1e-4, Δmin=1e-10,
                tr_exclude_objective=true, max_time=Inf, stats=nothing,
-               verbose=false) :: DesignTrace
+               require_certified=false, verbose=false) :: DesignTrace
 
 Sequential linearization (Kamri's SLM) on the dual PEP NSDP, in the policy
 space of `dp` (`IdentityPolicy` = Kamri's free step sizes).
@@ -256,6 +260,9 @@ Budget: each iteration costs one tangent SDP and one PEP solve; `solves_hist`
 counts PEP solves and `tangent_hist` tangent SDPs. Optional `stats::Dict`
 receives the trust-radius, ratio, and acceptance histories, tangent termination
 statuses, and separate model-build, tangent-solve, and trial-PEP timings.
+Set `require_certified=true` to reject PEP values that fail the numerical
+certificate checks, including at initialization. Defaults to false for
+compatibility; use true for measured best-so-far comparisons.
 """
 function design_slm(dp::DesignProblem, ω0::AbstractVector{<:Real};
                     iters::Int = 1000, Δ0::Float64 = 100.0,
@@ -265,6 +272,7 @@ function design_slm(dp::DesignProblem, ω0::AbstractVector{<:Real};
                     Δmin::Float64 = 1e-10, tr_exclude_objective::Bool = true,
                     max_time::Float64 = Inf,
                     stats::Union{Nothing,Dict{Symbol,Any}} = nothing,
+                    require_certified::Bool = false,
                     verbose::Bool = false)
     dp.facial_reduction == :none ||
         error("design_slm requires dual multipliers; facial reduction is unsupported")
@@ -274,7 +282,7 @@ function design_slm(dp::DesignProblem, ω0::AbstractVector{<:Real};
     κ = length(ω0)
     ω = collect(Float64, ω0)
     t_initial_pep = time()
-    W, sol = _safe_pep(dp, ω)
+    W, sol = _safe_pep(dp, ω; require_certified)
     initial_pep_time = time() - t_initial_pep
     sol === nothing && error("design_slm: PEP solve failed at the initial point")
     npep = 1
@@ -352,7 +360,7 @@ function design_slm(dp::DesignProblem, ω0::AbstractVector{<:Real};
         pred = objective_value(model)
         ωt = ω .+ step
         t_trial_pep = time()
-        Wt, solt = _safe_pep(dp, ωt)
+        Wt, solt = _safe_pep(dp, ωt; require_certified)
         push!(trial_pep_time, time() - t_trial_pep)
         npep += 1
 

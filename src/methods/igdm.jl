@@ -142,24 +142,54 @@ function evaluate_policy(pol::IGDMKMemoryPolicy, ω::AbstractVector{<:Real}, N::
 end
 
 """
-    IGDMStationaryPolicy(K)
+    IGDMStationaryPolicy(K, base=IdentityPolicy())
 
-Shift-invariant memory: β_{n,n−ℓ} = ω[ℓ+1] for lags ℓ = 0..K (κ = K+1).
+Apply a scalar schedule to the lag axis, not to iteration time:
+`β_{n,n−ℓ} = evaluate_policy(base, ω, K+1)[1][ℓ+1]`, for lags `ℓ = 0..K`.
+Older lags are zero. The same lag weights are repeated at every iteration.
+The base's index 1 corresponds to lag 0; its horizon is always `K+1`.
+
+The default preserves one free coefficient per lag. Any scalar schedule
+(power law, DCT, custom FunctionPolicy, etc.) can instead parameterize the
+lag weights. Keep the same policy, including K, to reuse ω at longer horizons;
+neither the parameter count nor the lag weights then changes with N.
 """
-struct IGDMStationaryPolicy <: AbstractPolicy
+struct IGDMStationaryPolicy{P<:AbstractPolicy} <: AbstractPolicy
     K::Int
+    base::P
+    function IGDMStationaryPolicy(K::Int, base::P = IdentityPolicy()) where {P<:AbstractPolicy}
+        K >= 0 || throw(ArgumentError("stationary memory K must be nonnegative"))
+        return new{P}(K, base)
+    end
 end
-nparams(pol::IGDMStationaryPolicy, N::Int) = pol.K + 1
+nparams(pol::IGDMStationaryPolicy, N::Int) = nparams(pol.base, pol.K + 1)
+policy_label(pol::IGDMStationaryPolicy) =
+    "stationary_K$(pol.K)_$(policy_label(pol.base))"
+
 function evaluate_policy(pol::IGDMStationaryPolicy, ω::AbstractVector{<:Real}, N::Int)
+    N >= 1 || throw(ArgumentError("stationary policy horizon N must be positive"))
+    κ = nparams(pol, N)
+    length(ω) == κ ||
+        throw(DimensionMismatch("stationary policy expects $κ parameters, got $(length(ω))"))
+    s, Js, Hs = evaluate_policy(pol.base, ω, pol.K + 1)
+    length(s) == pol.K + 1 && size(Js) == (pol.K + 1, κ) ||
+        throw(DimensionMismatch("stationary base must produce K+1 scalar lag weights"))
+    Hs === nothing || length(Hs) == pol.K + 1 ||
+        throw(DimensionMismatch("stationary base must return K+1 Hessians"))
     p = igdm_dof(N)
     η = zeros(p)
-    J = zeros(p, pol.K + 1)
+    J = zeros(p, κ)
+    H = Hs === nothing ? nothing :
+        Vector{Union{Nothing,Matrix{Float64}}}(nothing, p)
     for n in 1:N, ℓ in 0:min(pol.K, n - 1)
         r = igdm_flat_index(n, n - ℓ)
-        η[r] = ω[ℓ + 1]
-        J[r, ℓ + 1] = 1.0
+        η[r] = s[ℓ + 1]
+        J[r, :] = Js[ℓ + 1, :]
+        if Hs !== nothing && Hs[ℓ + 1] !== nothing
+            H[r] = copy(Hs[ℓ + 1])
+        end
     end
-    return η, J, nothing
+    return η, J, H
 end
 
 """

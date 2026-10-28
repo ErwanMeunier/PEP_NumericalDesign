@@ -1,0 +1,35 @@
+﻿Evaluating 6 (design, horizon) pairs on 3 workers; saving to C:\Users\ermeunier\Documents\GitHub\PEP_NumericalDesign\experiments\results\anytime_ogd_zPmohW\full_range.toml
+[  1/  6    287s] N=48 constant/hrdp_max/geometric        W=11.05331859 ratio=1.59541 (250.8s, worker 2)
+[  2/  6    288s] N=48 constant/reuse/N16                 W=8.00000002 ratio=1.15470 (251.5s, worker 4)
+[  3/  6    288s] N=48 constant/reuse/N0                  W=9.89949498 ratio=1.42887 (254.2s, worker 3)
+[  4/  6    524s] N=48 power_law/hrdp_max/geometric       W=8.51968202 ratio=1.22971 (235.8s, worker 3)
+[  5/  6    526s] N=48 normalizer                         W=6.92820339 ratio=1.00000 (237.9s, worker 4)
+[  6/  6    574s] N=48 inv_sqrt/classical_anytime/none    W=9.01243609 ratio=1.30083 (285.8s, worker 2)
+
+Complete block N = 2..40 (39 horizons) for all 15 designs; extra horizons: [48]
+design                                 worst  argN  trainset   wins>N0      N=48
+constant/reuse/N0                     1.3416    40       NaN     0/32     1.4289
+inv_sqrt/textbook/none                1.3684    40       NaN     0/32        NaN
+inv_sqrt/classical_anytime/none       1.2910    40       NaN     6/32     1.3008
+constant/hrdp_mean/window             1.6324    40    1.0875     0/32        NaN
+constant/hrdp_max/window              1.7393    40    1.0607     0/32        NaN
+inv_sqrt/hrdp_mean/window             1.2908    40    1.1668     6/32        NaN
+inv_sqrt/hrdp_max/window              1.2911    40    1.1664     6/32        NaN
+power_law/hrdp_mean/window            1.6323    40    1.0875     0/32        NaN
+power_law/hrdp_max/window             1.4256    40    1.0533     0/32        NaN
+log_poly2/hrdp_mean/window            1.6326    40    1.0874     0/32        NaN
+log_poly2/hrdp_max/window             1.9596    40    1.0442     0/32        NaN
+constant/hrdp_max/geometric           1.4886    40    1.1245     0/32     1.5954
+inv_sqrt/hrdp_max/geometric           1.2909    40    1.2294     6/32        NaN
+power_law/hrdp_max/geometric          1.1949    40    1.0872    21/32     1.2297
+constant/reuse/N16                    1.2990     3       NaN    29/32     1.1547
+
+Normalizer check: 40 horizons, max |W_N(1/sqrt N)/sqrt N - 1| = 2.32e-08
+Free-step check N= 2: 6 SLM runs, best/sqrt(N) = 1.00000000
+Free-step check N= 3: 6 SLM runs, best/sqrt(N) = 1.00000000
+Free-step check N= 4: 6 SLM runs, best/sqrt(N) = 1.00000001
+Free-step check N= 6: 6 SLM runs, best/sqrt(N) = 1.00000001
+Free-step check N= 8: 6 SLM runs, best/sqrt(N) = 1.00000000
+Free-step check N=12: 6 SLM runs, best/sqrt(N) = 1.00000000
+Free-step check N=16: 6 SLM runs, best/sqrt(N) = 1.00000001
+Saved full-range study: C:\Users\ermeunier\Documents\GitHub\PEP_NumericalDesign\experiments\results\anytime_ogd_zPmohW\full_range.toml

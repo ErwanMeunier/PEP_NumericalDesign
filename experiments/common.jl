@@ -147,6 +147,12 @@ function policy_suite(method::Symbol, N::Int; L = 1.0, D = 1.0, μ = 0.5,
             ("stationary_K1", IGDMStationaryPolicy(1), P([h, 0.0])),
             ("lag1_power_law", IGDMLagPolicy(1, PowerLawPolicy()),
              P([h, 0.0, 0.0, 0.0, 0.0, 0.0])),
+            ("stationary_K1_constant", IGDMStationaryPolicy(1, ConstantPolicy()),
+             P([h / 2])),
+            ("stationary_K1_power_law", IGDMStationaryPolicy(1, PowerLawPolicy()),
+             P([h, 2.0, 0.0])),
+            ("stationary_K1_dct1", IGDMStationaryPolicy(1, dct_policy(1)),
+             P([h / 2, h / 2])),
         ]
     end
     error("unknown method :$method")
